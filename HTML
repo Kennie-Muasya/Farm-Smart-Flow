@@ -1,0 +1,628 @@
+## Project structure
+
+```
+farm-smart-flow/
+├─ package.json
+├─ vite.config.js
+├─ index.html
+├─ README.md
+├─ firebase.rules (example)
+├─ public/
+│  └─ favicon.ico
+└─ src/
+   ├─ main.jsx
+   ├─ App.jsx
+   ├─ styles.css
+   ├─ services/
+   │  └─ firebase.js
+   ├─ components/
+   │  ├─ TopNav.jsx
+   │  ├─ Landing.jsx
+   │  ├─ Farmer/
+   │  │  ├─ FarmerPortal.jsx
+   │  │  └─ FarmerListings.jsx
+   │  ├─ Buyer.jsx
+   │  ├─ Transport.jsx
+   │  ├─ Chat/
+   │  │  ├─ ChatPage.jsx
+   │  │  └─ StartThreadForm.jsx
+   │  └─ Admin/
+   │     ├─ AdminDashboard.jsx
+   │     └─ StatCard.jsx
+```
+
+---
+
+## package.json
+
+```json
+{
+  "name": "farm-smart-flow",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "firebase": "^10.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.12.0",
+    "recharts": "^2.4.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.0.0",
+    "vite": "^5.0.0"
+  }
+}
+```
+
+---
+
+## vite.config.js
+
+```js
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  server: { port: 5173 }
+});
+```
+
+---
+
+## index.html
+
+```html
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Farm Smart Flow</title>
+    <link rel="icon" href="/favicon.ico">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+```
+
+---
+
+## README.md (local copy)
+
+```md
+Farm Smart Flow — React + Firebase
+
+Quick start
+
+1. Copy files into a directory.
+2. Run `npm install`.
+3. Replace `src/services/firebase.js` config with your Firebase project values.
+4. Run `npm run dev`.
+
+Deploy
+- Build: `npm run build`
+- Deploy to Vercel/Netlify/GitHub Pages from the built `dist` folder.
+```
+
+---
+
+## firebase.rules (example Firestore / Storage rules)
+
+```text
+// Firestore rules
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users collection - users can read/write their own doc
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Listings - anyone can read, only authenticated can create
+    match /listings/{listingId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.ownerId;
+    }
+
+    // Threads
+    match /threads/{threadId} {
+      allow read: if request.auth != null && request.auth.uid in resource.data.participants;
+      allow create: if request.auth != null;
+
+      match /messages/{messageId} {
+        allow read: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/threads/$(threadId)).data.participants;
+        allow create: if request.auth != null;
+      }
+    }
+  }
+}
+
+// Storage rules
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /listings/{listingId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}
+```
+
+---
+
+## src/main.jsx
+
+```jsx
+import React from 'react'
+import { createRoot } from 'react-dom/client'
+import { BrowserRouter } from 'react-router-dom'
+import App from './App'
+import './styles.css'
+
+createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </React.StrictMode>
+)
+```
+
+---
+
+## src/services/firebase.js
+
+```js
+import { initializeApp } from 'firebase/app'
+import { getAuth } from 'firebase/auth'
+import { getFirestore } from 'firebase/firestore'
+import { getStorage } from 'firebase/storage'
+
+// TODO: Replace the following with your app's Firebase project configuration
+const firebaseConfig = {
+  apiKey: 'YOUR_API_KEY',
+  authDomain: 'YOUR_AUTH_DOMAIN',
+  projectId: 'YOUR_PROJECT_ID',
+  storageBucket: 'YOUR_STORAGE_BUCKET',
+  messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
+  appId: 'YOUR_APP_ID'
+}
+
+const app = initializeApp(firebaseConfig)
+export const auth = getAuth(app)
+export const db = getFirestore(app)
+export const storage = getStorage(app)
+
+export default app
+```
+
+---
+
+## src/styles.css
+
+```css
+:root{
+  --green:#0a7a33;
+  --dark:#064b24;
+}
+*{box-sizing:border-box}
+body{font-family:Inter,Arial,Helvetica,sans-serif;margin:0;background:#f4f7f3;color:#222}
+header{background:var(--dark);color:#fff;padding:12px 20px;display:flex;justify-content:space-between;align-items:center}
+a{color:inherit}
+.container{max-width:1100px;margin:20px auto;padding:0 16px}
+.card{background:#fff;padding:16px;border-radius:8px;border:1px solid #eee}
+.btn{background:var(--green);color:#fff;border:none;padding:10px 14px;border-radius:6px;cursor:pointer}
+img.preview{width:100%;height:160px;object-fit:cover;border-radius:6px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+```
+
+---
+
+## src/App.jsx
+
+```jsx
+import React from 'react'
+import { Routes, Route, Link } from 'react-router-dom'
+import TopNav from './components/TopNav'
+import Landing from './components/Landing'
+import FarmerPortal from './components/Farmer/FarmerPortal'
+import Buyer from './components/Buyer'
+import Transport from './components/Transport'
+import ChatPage from './components/Chat/ChatPage'
+import AdminDashboard from './components/Admin/AdminDashboard'
+
+export default function App(){
+  return (
+    <div>
+      <TopNav />
+      <main className="container">
+        <Routes>
+          <Route path="/" element={<Landing/>} />
+          <Route path="/farmer" element={<FarmerPortal/>} />
+          <Route path="/buyer" element={<Buyer/>} />
+          <Route path="/transport" element={<Transport/>} />
+          <Route path="/chat" element={<ChatPage/>} />
+          <Route path="/admin" element={<AdminDashboard/>} />
+        </Routes>
+      </main>
+    </div>
+  )
+}
+```
+
+---
+
+## src/components/TopNav.jsx
+
+```jsx
+import React, {useEffect, useState} from 'react'
+import { Link } from 'react-router-dom'
+import { auth, db } from '../services/firebase'
+import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth'
+import { doc, getDoc, setDoc } from 'firebase/firestore'
+
+export default function TopNav(){
+  const [user, setUser] = useState(null)
+
+  useEffect(()=>{
+    const unsub = onAuthStateChanged(auth, async (u)=>{
+      if(u){
+        const ud = await getDoc(doc(db,'users',u.uid))
+        if(!ud.exists()){
+          await setDoc(doc(db,'users',u.uid),{ email:u.email, displayName:u.displayName || '', createdAt: Date.now(), role:'buyer'})
+        }
+        setUser(u)
+      } else setUser(null)
+    })
+    return ()=>unsub()
+  },[])
+
+  async function signInGoogle(){
+    const provider = new GoogleAuthProvider()
+    await signInWithPopup(auth, provider)
+  }
+
+  return (
+    <header>
+      <div><strong>Farm Smart Flow</strong> — Kenya</div>
+      <nav style={{display:'flex', gap:12}}>
+        <Link to="/">Home</Link>
+        <Link to="/farmer">Farmer</Link>
+        <Link to="/buyer">Buyer</Link>
+        <Link to="/transport">Transport</Link>
+        <Link to="/chat">Chat</Link>
+        <Link to="/admin">Admin</Link>
+        {user ? (
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <span style={{fontSize:13}}>{user.email}</span>
+            <button onClick={()=>signOut(auth)} className="btn" style={{background:'#e63946'}}>Logout</button>
+          </div>
+        ) : (
+          <button onClick={signInGoogle} className="btn">Sign in</button>
+        )}
+      </nav>
+    </header>
+  )
+}
+```
+
+---
+
+## src/components/Landing.jsx
+
+```jsx
+import React from 'react'
+import { Link } from 'react-router-dom'
+
+export default function Landing(){
+  return (
+    <div>
+      <section className="card" style={{backgroundImage:'linear-gradient(120deg,#e8f6ef,white)', marginBottom:12}}>
+        <h1>Connect — Trade — Deliver</h1>
+        <p>Farm Smart Flow connects Kenyan farmers, buyers and transporters with secure payments and realtime chat.</p>
+        <div style={{display:'flex', gap:8}}>
+          <Link to="/farmer"><button className="btn">Farmer Portal</button></Link>
+          <Link to="/buyer"><button className="btn">Buyer Portal</button></Link>
+        </div>
+      </section>
+    </div>
+  )
+}
+```
+
+---
+
+## src/components/Farmer/FarmerPortal.jsx
+
+```jsx
+import React, {useState} from 'react'
+import FarmerListings from './FarmerListings'
+import { db, storage, auth } from '../../services/firebase'
+import { addDoc, collection, serverTimestamp, updateDoc } from 'firebase/firestore'
+import { ref as sRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
+
+const counties = [ /* same counties list as earlier */ 'Nairobi','Mombasa','Kisumu','Nakuru','Kiambu','Kericho','Bomet','Uasin Gishu','Elgeyo-Marakwet','Kakamega','Bungoma','Busia','Siaya','Homa Bay','Migori','Nyamira','Kisii','Embu','Meru','Tharaka-Nithi','Laikipia','Nyeri','Kirinyaga','Murang\'a','Machakos','Kitui','Makueni','Kajiado','Narok','Turkana','West Pokot','Trans Nzoia','Taita-Taveta','Kwale','Kilifi','Lamu','Garissa','Wajir','Mandera','Marsabit','Isiolo','Samburu','Baringo','Nandi','Vihiga','Vihiga' ]
+
+export default function FarmerPortal(){
+  const [produceType,setProduceType] = useState('Hass Avocado')
+  const [quantity,setQuantity] = useState(100)
+  const [price,setPrice] = useState(60)
+  const [pickupCounty,setPickupCounty] = useState(counties[0])
+  const [files,setFiles] = useState([])
+  const [previews,setPreviews] = useState([])
+  const [progress,setProgress] = useState({})
+
+  function onFiles(e){
+    const chosen = Array.from(e.target.files).slice(0,6)
+    setFiles(chosen)
+    setPreviews(chosen.map(f=>URL.createObjectURL(f)))
+  }
+
+  async function createListing(){
+    if(files.length===0){ alert('Upload at least one image'); return }
+    const ownerId = auth.currentUser ? auth.currentUser.uid : null
+    const listingRef = await addDoc(collection(db,'listings'),{ produceType, quantity, price, pickupCounty, ownerId, createdAt: serverTimestamp(), images: [] })
+    const urls = []
+    for(const f of files){
+      const path = `listings/${listingRef.id}/${Date.now()}_${f.name}`
+      const r = sRef(storage, path)
+      const task = uploadBytesResumable(r, f)
+      await new Promise((res, rej)=>{
+        task.on('state_changed', s=>{
+          const pct = Math.round((s.bytesTransferred / s.totalBytes)*100)
+          setProgress(prev=>({...prev, [f.name]: pct}))
+        }, rej, async ()=>{ const url = await getDownloadURL(task.snapshot.ref); urls.push(url); res() })
+      })
+    }
+    await updateDoc(listingRef, { images: urls })
+    setFiles([]); setPreviews([]); setProgress({})
+    alert('Listing created')
+  }
+
+  return (
+    <div>
+      <h2>Farmer — Create Listing</h2>
+      <div className="card">
+        <label>Produce Type</label>
+        <select value={produceType} onChange={e=>setProduceType(e.target.value)} style={{width:'100%',padding:8}}>
+          <option>Hass Avocado</option>
+          <option>French Beans (A-Grade)</option>
+          <option>Maize (Dry)</option>
+          <option>Tomatoes</option>
+        </select>
+
+        <label>Quantity (Kg)</label>
+        <input type="number" value={quantity} onChange={e=>setQuantity(e.target.value)} style={{width:'100%',padding:8}}/>
+
+        <label>Price per Kg (KES)</label>
+        <input type="number" value={price} onChange={e=>setPrice(e.target.value)} style={{width:'100%',padding:8}}/>
+
+        <label>Pickup County</label>
+        <select value={pickupCounty} onChange={e=>setPickupCounty(e.target.value)} style={{width:'100%',padding:8}}>
+          {counties.map(c=> <option key={c} value={c}>{c}</option>)}
+        </select>
+
+        <label>Upload Images (max 6)</label>
+        <input type="file" multiple accept="image/*" onChange={onFiles} />
+
+        <div style={{display:'flex',gap:8,marginTop:10}}>
+          {previews.map((p,i)=> (
+            <div key={i} style={{width:140}}>
+              <img className="preview" src={p} alt="preview" />
+              <div style={{fontSize:12}}>{files[i] && (progress[files[i].name] ? `${progress[files[i].name]}%` : files[i].name)}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{marginTop:12}}>
+          <button onClick={createListing} className="btn">Create Listing</button>
+        </div>
+      </div>
+
+      <FarmerListings />
+    </div>
+  )
+}
+```
+
+---
+
+## src/components/Farmer/FarmerListings.jsx
+
+```jsx
+import React, {useEffect, useState} from 'react'
+import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore'
+import { db } from '../../services/firebase'
+
+export default function FarmerListings(){
+  const [listings,setListings] = useState([])
+  useEffect(()=>{
+    const q = query(collection(db,'listings'), orderBy('createdAt','desc'), limit(20))
+    const unsub = onSnapshot(q, snap=> setListings(snap.docs.map(d=>({id:d.id, ...d.data()}))))
+    return ()=>unsub()
+  },[])
+
+  return (
+    <div style={{marginTop:20}}>
+      <h3>Recent Listings</h3>
+      <div className="grid-2">
+        {listings.map(l=> (
+          <div key={l.id} className="card">
+            <strong>{l.produceType}</strong>
+            <div style={{fontSize:13,color:'#555'}}>{l.quantity} Kg — KES {l.price}/Kg</div>
+            <div style={{marginTop:8}}>
+              {l.images && l.images.slice(0,3).map((u,idx)=> <img key={idx} src={u} alt="p" style={{width:80,height:60,objectFit:'cover',marginRight:6,borderRadius:6}} />)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+```
+
+---
+
+## src/components/Buyer.jsx
+
+```jsx
+import React, {useState, useEffect} from 'react'
+import { collection, query, orderBy, getDocs, limit } from 'firebase/firestore'
+import { db } from '../services/firebase'
+
+const counties = [ /* same counties list */ 'Nairobi','Mombasa','Kisumu','Nakuru','Kiambu','Kericho','Bomet','Uasin Gishu' ]
+
+export default function Buyer(){
+  const [qText,setQText] = useState('')
+  const [county,setCounty] = useState(counties[0])
+  const [results,setResults] = useState([])
+
+  async function search(){
+    const snap = await getDocs(query(collection(db,'listings'), orderBy('createdAt','desc'), limit(50)))
+    const items = snap.docs.map(d=>({id:d.id, ...d.data()}))
+    const filtered = items.filter(i => i.produceType.toLowerCase().includes(qText.toLowerCase()) && (county ? i.pickupCounty === county : true))
+    setResults(filtered)
+  }
+
+  useEffect(()=>{ search() },[])
+
+  return (
+    <div>
+      <h2>Buyer — Search Listings</h2>
+      <div style={{display:'flex',gap:8}}>
+        <input value={qText} onChange={e=>setQText(e.target.value)} placeholder="Avocado, Maize..." style={{flex:1,padding:8}}/>
+        <select value={county} onChange={e=>setCounty(e.target.value)} style={{width:200,padding:8}}>
+          {counties.map(c=> <option key={c} value={c}>{c}</option>)}
+        </select>
+        <button onClick={search} className="btn">Search</button>
+      </div>
+
+      <div style={{marginTop:16}}>
+        <h3>Results</h3>
+        <div className="grid-2">
+          {results.map(r=> (
+            <div key={r.id} className="card">
+              <strong>{r.produceType}</strong>
+              <div style={{fontSize:13,color:'#555'}}>{r.quantity} Kg — KES {r.price}/Kg</div>
+              {r.images && r.images[0] && <img src={r.images[0]} alt="img" style={{width:120,height:90,objectFit:'cover',borderRadius:6}}/>}
+              <div style={{marginTop:8}}>
+                <button onClick={()=>window.location.href='/chat'} className="btn">Message Seller</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+```
+
+---
+
+## src/components/Transport.jsx
+
+```jsx
+import React from 'react'
+export default function Transport(){
+  return (
+    <div>
+      <h2>Transport Jobs</h2>
+      <div className="card">
+        <h4>Job: Avocado (1,000kg) — Nakuru to Nairobi</h4>
+        <p>Distance: 185 KM</p>
+        <label>Bid (KES)</label>
+        <input type="number" style={{padding:8}}/>
+        <button className="btn" style={{marginLeft:8}}>Submit Bid</button>
+      </div>
+    </div>
+  )
+}
+```
+
+---
+
+## src/components/Chat/ChatPage.jsx
+
+```jsx
+import React, {useEffect, useState, useRef} from 'react'
+import { auth, db } from '../../services/firebase'
+import { onAuthStateChanged } from 'firebase/auth'
+import { collection, query, where, onSnapshot, orderBy, addDoc, getDocs } from 'firebase/firestore'
+import StartThreadForm from './StartThreadForm'
+
+export default function ChatPage(){
+  const [threads,setThreads] = useState([])
+  const [selectedThread,setSelectedThread] = useState(null)
+  const [user,setUser] = useState(null)
+  const [messageText,setMessageText] = useState('')
+  const messagesRef = useRef(null)
+
+  useEffect(()=>{
+    const unsubAuth = onAuthStateChanged(auth, async (u)=>{
+      setUser(u)
+      if(u){
+        const q = query(collection(db,'threads'), where('participants','array-contains', u.uid))
+        const unsub = onSnapshot(q, snap=> setThreads(snap.docs.map(d=>({id:d.id, ...d.data()}))))
+        return ()=>unsub()
+      } else setThreads([])
+    })
+    return ()=>unsubAuth()
+  },[])
+
+  useEffect(()=>{
+    if(selectedThread){
+      const q = query(collection(db,`threads/${selectedThread.id}/messages`), orderBy('createdAt','asc'))
+      const unsub = onSnapshot(q, snap=>{
+        setSelectedThread(prev => ({...prev, messages: snap.docs.map(d=>({id:d.id, ...d.data()}))}))
+        setTimeout(()=> messagesRef.current && (messagesRef.current.scrollTop = messagesRef.current.scrollHeight), 80)
+      })
+      return ()=>unsub()
+    }
+  },[selectedThread && selectedThread.id])
+
+  async function startThreadWithUser(targetUserId){
+    if(!user){ alert('Please sign in'); return }
+    const q = query(collection(db,'threads'), where('participants','array-contains', user.uid))
+    const snap = await getDocs(q)
+    let found = null
+    snap.forEach(d=>{ const data = d.data(); if(data.participants.includes(targetUserId)) found = {id:d.id, ...data} })
+    if(found){ setSelectedThread(found); return }
+    const tRef = await addDoc(collection(db,'threads'), { participants: [user.uid, targetUserId], createdAt: Date.now() })
+    setSelectedThread({id:tRef.id, participants:[user.uid, targetUserId], messages:[]})
+  }
+
+  async function sendMessage(){
+    if(!user || !selectedThread || !messageText.trim()) return
+    await addDoc(collection(db,`threads/${selectedThread.id}/messages`), { sender:user.uid, text: messageText.trim(), createdAt: Date.now() })
+    setMessageText('')
+  }
+
+  return (
+    <div style={{display:'flex',gap:12}}>
+      <div style={{width:260}} className="card">
+        <h4>Threads</h4>
+        <div>
+          {threads.map(t=> <div key={t.id} style={{padding:8,borderBottom:'1px solid #f0f0f0',cursor:'pointer'}} onClick={()=>setSelectedThread(t)}>{t.id}</div>)}
+        </div>
+        <div style={{marginTop:12}}>
+          <label>Start thread (enter user id)</label>
+          <StartThreadForm onStart={startThreadWithUser} />
+        </div>
+      </div>
+
+      <div className="card" style={{flex:1}}>
+        {selectedThread ? (
+          <>
+            <h4>Thread: {selectedThread.id}</h4>
+            <div ref={messagesRef} style={{height:380,overfl
